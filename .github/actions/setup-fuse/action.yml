@@ -1,0 +1,49 @@
+name: Setup FUSE
+description: Install and configure FUSE for filesystem testing
+
+inputs:
+  fuse-version:
+    description: 'FUSE version (2 or 3)'
+    required: false
+    default: '3'
+  allow-other:
+    description: 'Enable user_allow_other in fuse.conf'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install FUSE ${{ inputs.fuse-version }}
+      shell: bash
+      run: |
+        if [ "${{ inputs.fuse-version }}" = "3" ]; then
+          sudo apt-get update
+          sudo apt-get install -y fuse3 libfuse3-dev
+        else
+          sudo apt-get update
+          sudo apt-get install -y fuse libfuse-dev
+        fi
+    
+    - name: Configure FUSE
+      if: inputs.allow-other == 'true'
+      shell: bash
+      run: |
+        sudo sed -i 's/#user_allow_other/user_allow_other/' /etc/fuse.conf
+        cat /etc/fuse.conf | grep user_allow_other
+    
+    - name: Verify FUSE installation
+      shell: bash
+      run: |
+        if [ "${{ inputs.fuse-version }}" = "3" ]; then
+          fusermount3 --version
+        else
+          fusermount --version
+        fi
+    
+    - name: Add user to fuse group
+      shell: bash
+      run: |
+        if getent group fuse > /dev/null; then
+          sudo usermod -a -G fuse $USER
+        fi

@@ -1,0 +1,45 @@
+name: Cache Cargo
+description: Cache Cargo registry, git dependencies, and build artifacts
+
+inputs:
+  cache-key-prefix:
+    description: 'Prefix for cache key (allows multiple caches per repo)'
+    required: false
+    default: 'cargo'
+  save-on-fail:
+    description: 'Save cache even if workflow fails'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Get Rust version
+      id: rust-version
+      shell: bash
+      run: |
+        echo "version=$(rustc --version | awk '{print $2}')" >> $GITHUB_OUTPUT
+    
+    - name: Cache Cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ inputs.cache-key-prefix }}-registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-registry-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-
+          ${{ inputs.cache-key-prefix }}-registry-${{ runner.os }}-
+        save-always: ${{ inputs.save-on-fail == 'true' }}
+    
+    - name: Cache Cargo build
+      uses: actions/cache@v4
+      with:
+        path: target/
+        key: ${{ inputs.cache-key-prefix }}-build-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
+        restore-keys: |
+          ${{ inputs.cache-key-prefix }}-build-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}-
+          ${{ inputs.cache-key-prefix }}-build-${{ runner.os }}-${{ steps.rust-version.outputs.version }}-
+          ${{ inputs.cache-key-prefix }}-build-${{ runner.os }}-
+        save-always: ${{ inputs.save-on-fail == 'true' }}

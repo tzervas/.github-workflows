@@ -1,0 +1,72 @@
+name: Reusable CI Workflow
+
+on:
+  workflow_call:
+    inputs:
+      rust-version:
+        description: 'Rust version to use'
+        required: false
+        type: string
+        default: '1.84'
+      run-tests:
+        description: 'Run tests'
+        required: false
+        type: boolean
+        default: true
+      run-benchmarks:
+        description: 'Run benchmarks'
+        required: false
+        type: boolean
+        default: false
+      benchmark-isolation:
+        description: 'Enable benchmark isolation (CPU pinning, frequency locking)'
+        required: false
+        type: boolean
+        default: false
+      enable-fuse:
+        description: 'Enable FUSE support'
+        required: false
+        type: boolean
+        default: false
+      cache-key-prefix:
+        description: 'Cache key prefix for cargo caching'
+        required: false
+        type: string
+        default: 'cargo'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Rust
+        uses: tzervas/.github-workflows/actions/setup-rust@v1
+        with:
+          rust-version: ${{ inputs.rust-version }}
+      
+      - name: Setup FUSE
+        if: inputs.enable-fuse
+        uses: tzervas/.github-workflows/actions/setup-fuse@v1
+      
+      - name: Cache Cargo
+        uses: tzervas/.github-workflows/actions/cache-cargo@v1
+        with:
+          cache-key-prefix: ${{ inputs.cache-key-prefix }}
+      
+      - name: Build
+        run: cargo build --release --all-features
+      
+      - name: Run tests
+        if: inputs.run-tests
+        run: cargo test --release --all-features
+      
+      - name: Setup benchmark isolation
+        if: inputs.run-benchmarks && inputs.benchmark-isolation
+        uses: tzervas/.github-workflows/actions/benchmark-isolation@v1
+      
+      - name: Run benchmarks
+        if: inputs.run-benchmarks
+        run: cargo bench --all-features

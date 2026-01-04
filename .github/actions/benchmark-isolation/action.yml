@@ -1,0 +1,79 @@
+name: Benchmark Isolation
+description: Configure system for stable benchmark execution (CPU pinning, frequency locking)
+
+inputs:
+  cpu-cores:
+    description: 'CPU cores to pin benchmarks to (comma-separated, e.g., "0,1")'
+    required: false
+    default: '0,1'
+  disable-turbo:
+    description: 'Disable CPU turbo boost for stable frequencies'
+    required: false
+    default: 'true'
+  disable-hyperthreading:
+    description: 'Disable hyperthreading (may require sudo)'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Display current CPU configuration
+      shell: bash
+      run: |
+        echo "=== CPU Info ==="
+        lscpu
+        echo ""
+        echo "=== CPU Frequency Scaling ==="
+        cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null || echo "No scaling info available"
+    
+    - name: Disable CPU turbo boost
+      if: inputs.disable-turbo == 'true'
+      shell: bash
+      run: |
+        # Try to disable turbo boost (may not work in containers)
+        if [ -f /sys/devices/system/cpu/intel_pstate/no_turbo ]; then
+          echo "1" | sudo tee /sys/devices/system/cpu/intel_pstate/no_turbo || true
+          echo "Intel turbo disabled"
+        elif [ -f /sys/devices/system/cpu/cpufreq/boost ]; then
+          echo "0" | sudo tee /sys/devices/system/cpu/cpufreq/boost || true
+          echo "CPU boost disabled"
+        else
+          echo "Warning: Unable to disable CPU turbo boost (not supported in this environment)"
+        fi
+    
+    - name: Set CPU governor to performance
+      shell: bash
+      run: |
+        # Try to set performance governor
+        for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+          if [ -f "$cpu" ]; then
+            echo "performance" | sudo tee "$cpu" || true
+          fi
+        done
+        
+        # Verify
+        cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | sort -u || echo "Unable to verify CPU governor"
+    
+    - name: Disable hyperthreading
+      if: inputs.disable-hyperthreading == 'true'
+      shell: bash
+      run: |
+        echo "Note: Hyperthreading disable may not work in GitHub Actions runners"
+        # This typically requires physical CPU control
+        # Left as placeholder for self-hosted runners
+    
+    - name: Configure CPU affinity for benchmarks
+      shell: bash
+      run: |
+        echo "CPU cores allocated for benchmarks: ${{ inputs.cpu-cores }}"
+        echo "BENCHMARK_CPU_CORES=${{ inputs.cpu-cores }}" >> $GITHUB_ENV
+        echo "CARGO_BENCH_OPTS=--jobs 1" >> $GITHUB_ENV
+    
+    - name: Display final CPU configuration
+      shell: bash
+      run: |
+        echo "=== Final CPU Configuration ==="
+        lscpu | grep -E "CPU\(s\)|Thread|Core|Socket|MHz"
+        echo ""
+        echo "Benchmark will run on cores: ${{ inputs.cpu-cores }}"
