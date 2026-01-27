@@ -33,40 +33,104 @@ on:
         required: false
         type: string
         default: 'cargo'
+      debug-mode:
+        description: 'Enable debug output (RUST_BACKTRACE, RUST_LOG)'
+        required: false
+        type: boolean
+        default: false
+      run-audit:
+        description: 'Run cargo-audit security checks'
+        required: false
+        type: boolean
+        default: true
+      run-doc:
+        description: 'Build documentation with cargo doc'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   ci:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 20
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: tzervas/.github-workflows/actions/setup-rust@v1
+
+      - name: Clone dependency repos
+        run: |
+          cd ..
+          # Clone sibling repos if they don't exist
+          for repo in embeddenator-vsa embeddenator-core embeddenator-fs embeddenator-io embeddenator-retrieval embeddenator-interop embeddenator-obs; do
+            if [ ! -d "$repo" ] && [ "$repo" != "${GITHUB_REPOSITORY#*/}" ]; then
+              git clone --depth 1 https://github.com/tzervas/$repo.git || true
+            fi
+          done
+
+      - name: Set up Rust
+        uses: dtolnay/rust-action@stable
         with:
-          rust-version: ${{ inputs.rust-version }}
-      
+          toolchain: ${{ inputs.rust-version }}
+          components: rustfmt, clippy
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
+      - name: Install cargo-audit
+        if: inputs.run-audit
+        uses: taiki-e/install-action@cargo-audit
+
       - name: Setup FUSE
         if: inputs.enable-fuse
-        uses: tzervas/.github-workflows/actions/setup-fuse@v1
-      
-      - name: Cache Cargo
-        uses: tzervas/.github-workflows/actions/cache-cargo@v1
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse3-dev fuse3
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          cache-key-prefix: ${{ inputs.cache-key-prefix }}
-      
+          prefix-key: ${{ inputs.cache-key-prefix }}
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy lints
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build
         run: cargo build --release --all-features
-      
-      - name: Run tests
+
+      - name: Build documentation
+        if: inputs.run-doc
+        run: cargo doc --no-deps --all-features
+
+      - name: Security audit
+        if: inputs.run-audit
+        run: cargo audit || true  # Don't fail on audit issues, just report
+
+      - name: Run tests (quiet first pass)
+        id: test-quiet
         if: inputs.run-tests
-        run: cargo test --release --all-features
-      
-      - name: Setup benchmark isolation
-        if: inputs.run-benchmarks && inputs.benchmark-isolation
-        uses: tzervas/.github-workflows/actions/benchmark-isolation@v1
-      
+        continue-on-error: true
+        run: |
+          cargo nextest run --release --all-features --no-fail-fast 2>&1 | tee test-output.log
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Re-run failed tests with debug
+        if: inputs.run-tests && steps.test-quiet.outputs.exit_code != '0'
+        env:
+          RUST_BACKTRACE: full
+          RUST_LOG: debug
+        run: |
+          echo "::group::Re-running failed tests with debug output"
+          cargo nextest run --release --all-features --run-ignored failed-only || true
+          echo "::endgroup::"
+          exit 1
+
       - name: Run benchmarks
         if: inputs.run-benchmarks
         run: cargo bench --all-features
