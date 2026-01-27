@@ -72,7 +72,7 @@ jobs:
           done
 
       - name: Set up Rust
-        uses: dtolnay/rust-action@stable
+        uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ inputs.rust-version }}
           components: rustfmt, clippy
