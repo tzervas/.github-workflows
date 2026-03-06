@@ -2,11 +2,11 @@
 
 Reusable GitHub Actions workflows and composite actions for Embeddenator projects.
 
-## 📋 Overview
+##  Overview
 
 This repository provides centralized CI/CD workflows and actions that can be reused across all Embeddenator repositories. Version at `@v1` ensures automatic updates while maintaining stability.
 
-## 🔄 Reusable Workflows
+##  Reusable Workflows
 
 ### `reusable-ci.yml`
 
@@ -150,7 +150,7 @@ Or pin to specific release:
 uses: tzervas/.github-workflows/.github/workflows/reusable-ci.yml@v1.0.0
 ```
 
-## 📦 Complete Example
+##  Complete Example
 
 Full CI workflow with all features:
 
@@ -190,6 +190,6 @@ To update workflows:
 2. Tag new version: `git tag v1.x.x && git push --tags`
 3. Update `v1` tag: `git tag -f v1 && git push --tags -f`
 
-## 📄 License
+##  License
 
 MIT License - See [LICENSE](LICENSE)

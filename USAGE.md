@@ -199,11 +199,11 @@ uses: tzervas/.github-workflows/.github/workflows/reusable-ci.yml@main
 
 ## Benefits
 
-✅ **Consistency:** All repos use same CI configuration  
-✅ **Maintainability:** Update CI logic in one place  
-✅ **Speed:** Optimized caching strategies  
-✅ **Features:** FUSE, benchmark isolation built-in  
-✅ **Automatic Updates:** `@v1` gets new features automatically
+ **Consistency:** All repos use same CI configuration  
+ **Maintainability:** Update CI logic in one place  
+ **Speed:** Optimized caching strategies  
+ **Features:** FUSE, benchmark isolation built-in  
+ **Automatic Updates:** `@v1` gets new features automatically
 
 ## Next Steps
 
